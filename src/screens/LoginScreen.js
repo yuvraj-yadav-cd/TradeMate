@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,16 @@ const { width, height } = Dimensions.get('window');
 const LoginScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        navigation.replace('TabNavigator');
+      }
+    };
+    checkAuth();
+  }, []);
 
   const handleLogin = async (formData) => {
     try {

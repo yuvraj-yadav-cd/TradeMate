@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,22 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../theme';
 import SignupForm from '../components/forms/SignupForm';
+import { supabase } from '../lib/supabase';
 
 const { width, height } = Dimensions.get('window');
 
 const SignupScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        navigation.replace('TabNavigator');
+      }
+    };
+    checkAuth();
+  }, []);
 
   return (
     <ImageBackground
