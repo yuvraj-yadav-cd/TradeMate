@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     marginTop: SIZES.padding.xs,
   },
   placeholder: {
-    width: 40, // Same width as back button for alignment
+    width: 40,
   },
 });
 

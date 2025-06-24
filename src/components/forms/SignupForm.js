@@ -170,16 +170,16 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 340,
     alignSelf: 'center',
-    paddingVertical: SIZES.padding.md, // was lg, now md for less vertical space
+    paddingVertical: SIZES.padding.md,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SIZES.padding.sm, // was md, now sm for less space between fields
+    marginBottom: SIZES.padding.sm,
   },
   inputIcon: {
     marginRight: SIZES.padding.sm,
-    marginTop: SIZES.padding.sm, // was md, now sm
+    marginTop: SIZES.padding.sm,
   },
   input: {
     flex: 1,
@@ -190,9 +190,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: COLORS.primary.main,
     borderRadius: SIZES.radius.lg,
-    height: 65, // was 65, now 48 for a smaller button
-    marginTop: SIZES.padding.sm, // was md, now sm
-    marginBottom: SIZES.padding.sm, // was md, now sm
+    height: 65,
+    marginTop: SIZES.padding.sm,
+    marginBottom: SIZES.padding.sm,
     shadowColor: COLORS.primary.main,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,

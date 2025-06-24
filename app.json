@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "my-app",
+    "name": "TradeMate",
     "slug": "my-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/splash-icon.jpg",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/native1.png",
+      "image": "./assets/splash-icon.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -17,13 +17,17 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/splash-icon.jpg",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.yuvraj_yadav.myapp"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/splash-icon.jpg"
     },
     "plugins": [
       [
@@ -31,7 +35,18 @@
         {
           "photosPermission": "The app needs access to your photos to let you pick a profile picture."
         }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "preventAutoHide": true
+        }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "347f894b-c77a-432b-bbd8-8be4f9f6461e"
+      }
+    }
   }
 }

@@ -1,14 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator} from '@react-navigation/native-stack';
-import { View, Image } from 'react-native';
 import LoginScreen from './src/screens/LoginScreen';
 import SignupScreen from './src/screens/SignupScreen';
 import TabNavigator from './src/navigation/AppNavigator';
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
-import CheckoutScreen from './src/screens/CheckoutScreen';
-//import { CartProvider } from './src/contexts/CartContext';
-import { UserProvider } from './src/contexts/UserContext';
+import ChatRoomScreen from './src/screens/ChatRoomScreen';
 import { WishlistProvider } from './src/contexts/WishlistContext';
 import {
   useFonts,
@@ -28,13 +26,24 @@ export default function App() {
     Poppins_700Bold,
   });
 
+  useEffect(() => {
+    async function prepare() {
+      // Prevent auto-hide
+      await SplashScreen.preventAutoHideAsync();
+      // Wait at least 1 seconds
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Hide splash screen
+      await SplashScreen.hideAsync();
+    }
+    prepare();
+  }, []);
+
   if (!fontsLoaded) {
     return null;
   }
 
   return (
     <NavigationContainer>
-      <UserProvider>
         <WishlistProvider>
             <Stack.Navigator screenOptions={{ headerShown: false}}>
               <Stack.Screen name="Login" component={LoginScreen} />
@@ -44,25 +53,18 @@ export default function App() {
                 name="ProductDetail" 
                 component={ProductDetailScreen}
                 options={{
-                  headerShown: true,
-                  headerTitle: 'Product Details',
-                  headerStyle: { backgroundColor: '#ffffff' },
-                  headerTintColor: 'purple',
+                  headerShown: false,
                 }}
               />
               <Stack.Screen 
-                name="Checkout" 
-                component={CheckoutScreen}
+                name="ChatRoomScreen" 
+                component={ChatRoomScreen}
                 options={{
-                  headerShown: true,
-                  headerTitle: 'Checkout',
-                  headerStyle: { backgroundColor: '#ffffff' },
-                  headerTintColor: 'purple',
+                  headerShown: false,
                 }}
               />
             </Stack.Navigator>
         </WishlistProvider>
-      </UserProvider>
     </NavigationContainer>
   );
 }

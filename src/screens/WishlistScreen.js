@@ -12,12 +12,10 @@ import {
 import { useWishlist } from '../contexts/WishlistContext';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { COLORS, FONTS, SIZES, SHADOWS } from '../theme';
-//import Button from '../components/common/Button';
 import ScreenHeader from '../components/common/ScreenHeader';
 
 const WishlistScreen = ({ navigation }) => {
   const { wishlistItems, removeFromWishlist } = useWishlist();
-  //const { addToCart } = useCart();
 
   const renderItem = ({ item }) => (
     <View style={styles.wishlistItem}>
@@ -43,7 +41,6 @@ const WishlistScreen = ({ navigation }) => {
         <Text style={styles.productPrice}>
           ₹{item.price.toLocaleString('en-IN')}
         </Text>
-        {/* Removed Add to Cart / Move to Cart button */}
       </View>
     </View>
   );

@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  FlatList, 
-  StyleSheet, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
   Image,
   Dimensions,
   SafeAreaView,
@@ -13,40 +13,47 @@ import {
   ScrollView,
   TextInput,
   Platform,
-  ImageBackground
+  ImageBackground,
+  RefreshControl,
 } from 'react-native';
-//import { useCart } from '../contexts/CartContext';
 import { useWishlist } from '../contexts/WishlistContext';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-// Removed: import { fetchProducts } from '../services/productService';
 import { COLORS, FONTS, SIZES, SHADOWS, LAYOUT } from '../theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import CategoryList from '../components/CategoryList';
 import Svg, { Circle, Ellipse, Defs, LinearGradient as SvgLinearGradient, Stop, Rect, Path } from 'react-native-svg';
-import { supabase } from '../lib/supabase'; // <-- Add this import
+import { supabase } from '../lib/supabase';
 
-const { width } = Dimensions.get('window');
-const numColumns = width < 600 ? 2 : 3; // 2 columns on phones, 3 on tablets/web
+const { width, height } = Dimensions.get('window');
+
+const getNumColumns = () => {
+  if (width >= 900) return 4;
+  if (width >= 600) return 3;
+  return 2;
+};
+
 const cardSpacing = 24;
-const cardWidth = width / numColumns - cardSpacing;
+const cardWidth = (width - cardSpacing * (getNumColumns() + 1)) / getNumColumns();
 
 const HomeScreen = ({ navigation }) => {
-  //const { addToCart, items, updateQuantity } = useCart(); // Add items and updateQuantity
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchVisible, setIsSearchVisible] = useState(false);
-  const [sortBy, setSortBy] = useState('default'); // default, price_asc, price_desc, rating
-  const [activeIndex, setActiveIndex] = useState(0);
-  const flatListRef = useRef(null);
+  const [sortBy, setSortBy] = useState('default');
+  const [currentUserId, setCurrentUserId] = useState(null);
 
   useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setCurrentUserId(data?.user?.id);
+    };
+    getUser();
     loadProducts();
   }, []);
 
-  // Replaced fetchProducts with Supabase query
   const loadProducts = async () => {
     try {
       setLoading(true);
@@ -60,17 +67,9 @@ const HomeScreen = ({ navigation }) => {
       console.error('Error loading products:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
-
-  // const handleAddToCart = (item) => {
-  //   addToCart(item);
-  // };
-
-  // const getItemQuantity = (itemId) => {
-  //   const cartItem = items.find(item => item.id === itemId);
-  //   return cartItem ? cartItem.quantity : 0;
-  // };
 
   const toggleWishlist = (product) => {
     if (isInWishlist(product.id)) {
@@ -80,23 +79,46 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const categories = ['All', ...new Set(products.map(product => product.category))];
+  const getFilteredProducts = () => {
+    let filtered = [...products];
+    if (searchQuery) {
+      filtered = filtered.filter(product =>
+        product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.category.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    if (selectedCategory !== 'All') {
+      filtered = filtered.filter(product => product.category === selectedCategory);
+    }
+    switch (sortBy) {
+      case 'price_asc':
+        filtered.sort((a, b) => a.price - b.price);
+        break;
+      case 'price_desc':
+        filtered.sort((a, b) => b.price - a.price);
+        break;
+      case 'rating':
+        filtered.sort((a, b) => (b.rating?.rate || 0) - (a.rating?.rate || 0));
+        break;
+      default:
+        break;
+    }
+    return filtered;
+  };
 
-  const filteredProducts = selectedCategory === 'All' 
-    ? products 
-    : products.filter(product => product.category === selectedCategory);
-
-  // Update renderProduct to use responsive cardWidth
   const renderProduct = ({ item }) => (
-    <View style={[styles.productCard, { width: cardWidth }]}>
-      <TouchableOpacity 
+    <View style={[styles.productCard, { width: cardWidth, minHeight: width < 400 ? 260 : 320 }]}>
+      <TouchableOpacity
         onPress={() => navigation.navigate('ProductDetail', { product: item })}
+        activeOpacity={0.9}
       >
-        <Image
-          source={{ uri: item.image }}
-          style={styles.productImage}
-          resizeMode="contain"
-        />
+        <View style={{ width: '100%', aspectRatio: 1, backgroundColor: '#f5f5f5', alignItems: 'center', justifyContent: 'center' }}>
+          <Image
+            source={{ uri: item.image }}
+            style={{ width: '90%', height: '90%', borderRadius: 12 }}
+            resizeMode="contain"
+          />
+        </View>
         <View style={styles.productInfo}>
           <Text style={styles.productCategory}>{item.category}</Text>
           <Text style={styles.productTitle} numberOfLines={2}>
@@ -105,29 +127,36 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.productPrice}>
             ₹{item.price.toLocaleString('en-IN')}
           </Text>
-          <View style={styles.ratingContainer}>
-            <MaterialIcons name="star" size={16} color="#FFD700" />
-            <Text style={styles.ratingText}>
-              {item.rating?.rate || 0} ({item.rating?.count || 0})
-            </Text>
-          </View>
         </View>
       </TouchableOpacity>
-      {/* Wishlist button only */}
       <View style={styles.cartControls}>
         <TouchableOpacity
           style={styles.addToCartButton}
           onPress={() => toggleWishlist(item)}
         >
-          <MaterialIcons
-            name={isInWishlist(item.id) ? 'favorite' : 'favorite-border'}
-            size={22}
-            color={isInWishlist(item.id) ? COLORS.primary.main : COLORS.text.secondary}
-          />
           <Text style={styles.buttonText}>
             {isInWishlist(item.id) ? 'Wishlisted' : 'Add to Wishlist'}
           </Text>
         </TouchableOpacity>
+        {item.owner_id && currentUserId && item.owner_id !== currentUserId && (
+          <TouchableOpacity
+            style={[
+              styles.addToCartButton,
+              {
+                marginTop: 8,
+                backgroundColor: COLORS.secondary ? COLORS.secondary.main : '#FFD700',
+              },
+            ]}
+            onPress={() =>
+              navigation.navigate('ChatRoomScreen', {
+                partnerId: item.owner_id,
+                currentUserId,
+              })
+            }
+          >
+            <Text style={styles.buttonText}>Chat with Seller</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -142,24 +171,31 @@ const HomeScreen = ({ navigation }) => {
   );
 
   const getRecommendedProducts = () => {
-    // Get 4-5 products with highest ratings
+    // Recommend the 4 most recently added products
     return products
-      .sort((a, b) => (b.rating?.rate || 0) - (a.rating?.rate || 0))
+      .slice() // create a shallow copy
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(0, 4);
   };
 
   const RecommendationsSection = () => (
     <View style={styles.recommendationsContainer}>
       <Text style={styles.sectionTitle}>Recommended for You</Text>
-      <ScrollView 
-        horizontal 
+      <ScrollView
+        horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.recommendationsList}
       >
         {getRecommendedProducts().map((item) => (
-          <TouchableOpacity 
+          <TouchableOpacity
             key={item.id}
-            style={styles.recommendationCard}
+            style={[
+              styles.recommendationCard,
+              {
+                width: width < 400 ? 120 : width < 700 ? 160 : 200,
+                minHeight: width < 400 ? 140 : 180,
+              },
+            ]}
             onPress={() => navigation.navigate('ProductDetail', { product: item })}
           >
             <Image
@@ -174,12 +210,6 @@ const HomeScreen = ({ navigation }) => {
               <Text style={styles.recommendationPrice}>
                 ₹{item.price.toLocaleString('en-IN')}
               </Text>
-              <View style={styles.ratingContainer}>
-                <MaterialIcons name="star" size={16} color="#FFD700" />
-                <Text style={styles.ratingText}>
-                  {item.rating?.rate || 0}
-                </Text>
-              </View>
             </View>
           </TouchableOpacity>
         ))}
@@ -187,115 +217,75 @@ const HomeScreen = ({ navigation }) => {
     </View>
   );
 
-  // Add this filter function
-  const getFilteredProducts = () => {
-    let filtered = [...products];
-    
-    // Apply search filter
-    if (searchQuery) {
-      filtered = filtered.filter(product => 
-        product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.category.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    // Apply category filter
-    if (selectedCategory !== 'All') {
-      filtered = filtered.filter(product => product.category === selectedCategory);
-    }
-
-    // Apply sorting
-    switch (sortBy) {
-      case 'price_asc':
-        filtered.sort((a, b) => a.price - b.price);
-        break;
-      case 'price_desc':
-        filtered.sort((a, b) => b.price - a.price);
-        break;
-      case 'rating':
-        filtered.sort((a, b) => (b.rating?.rate || 0) - (a.rating?.rate || 0));
-        break;
-      default:
-        // Keep original order
-        break;
-    }
-
-    return filtered;
-  };
-
-  const SearchBar = () => (
-    <View style={styles.searchContainer}>
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search products..."
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        autoCapitalize="none"
-      />
-      {searchQuery ? (
-        <TouchableOpacity 
-          style={styles.clearButton}
-          onPress={() => setSearchQuery('')}
-        >
-          <MaterialIcons name="close" size={20} color="#666" />
-        </TouchableOpacity>
-      ) : null}
-    </View>
-  );
-
   const SortOptions = () => (
-    <ScrollView 
-      horizontal 
+    <ScrollView
+      horizontal
       showsHorizontalScrollIndicator={false}
       style={styles.sortContainer}
     >
       <TouchableOpacity
         style={[
           styles.sortButton,
-          sortBy === 'default' && styles.sortButtonActive
+          sortBy === 'default' && styles.sortButtonActive,
         ]}
         onPress={() => setSortBy('default')}
       >
-        <Text style={[
-          styles.sortButtonText,
-          sortBy === 'default' && styles.sortButtonTextActive
-        ]}>Default</Text>
+        <Text
+          style={[
+            styles.sortButtonText,
+            sortBy === 'default' && styles.sortButtonTextActive,
+          ]}
+        >
+          Default
+        </Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[
           styles.sortButton,
-          sortBy === 'price_asc' && styles.sortButtonActive
+          sortBy === 'price_asc' && styles.sortButtonActive,
         ]}
         onPress={() => setSortBy('price_asc')}
       >
-        <Text style={[
-          styles.sortButtonText,
-          sortBy === 'price_asc' && styles.sortButtonTextActive
-        ]}>Price: Low to High</Text>
+        <Text
+          style={[
+            styles.sortButtonText,
+            sortBy === 'price_asc' && styles.sortButtonTextActive,
+          ]}
+        >
+          Price: Low to High
+        </Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[
           styles.sortButton,
-          sortBy === 'price_desc' && styles.sortButtonActive
+          sortBy === 'price_desc' && styles.sortButtonActive,
         ]}
         onPress={() => setSortBy('price_desc')}
       >
-        <Text style={[
-          styles.sortButtonText,
-          sortBy === 'price_desc' && styles.sortButtonTextActive
-        ]}>Price: High to Low</Text>
+        <Text
+          style={[
+            styles.sortButtonText,
+            sortBy === 'price_desc' && styles.sortButtonTextActive,
+          ]}
+        >
+          Price: High to Low
+        </Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[
           styles.sortButton,
-          sortBy === 'rating' && styles.sortButtonActive
+          sortBy === 'rating' && styles.sortButtonActive,
         ]}
         onPress={() => setSortBy('rating')}
       >
-        <Text style={[
-          styles.sortButtonText,
-          sortBy === 'rating' && styles.sortButtonTextActive
-        ]}>Top Rated</Text>
+        <Text
+          style={[
+            styles.sortButtonText,
+            sortBy === 'rating' && styles.sortButtonTextActive,
+          ]}
+        >
+          Top Rated
+        </Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -323,17 +313,16 @@ const HomeScreen = ({ navigation }) => {
     },
   ];
 
-  // Update Banner to use responsive width/height
   const Banner = () => {
     const [activeIndex, setActiveIndex] = useState(0);
     const flatListRef = useRef(null);
     const gap = 12;
     const bannerWidth = width - SIZES.padding.sm * 2 - gap * 2;
-    const bannerHeight = width < 400 ? 180 : width < 700 ? 260 : 320; // Increased heights
+    const bannerHeight = width < 400 ? 180 : width < 700 ? 260 : 320;
 
     useEffect(() => {
       const interval = setInterval(() => {
-        setActiveIndex(prev => {
+        setActiveIndex((prev) => {
           const nextIndex = prev === bannerData.length - 1 ? 0 : prev + 1;
           if (flatListRef.current) {
             flatListRef.current.scrollToIndex({
@@ -386,12 +375,12 @@ const HomeScreen = ({ navigation }) => {
               <ImageBackground
                 source={{ uri: item.image }}
                 style={styles.bannerBgImage}
-                imageStyle={{ borderRadius: SIZES.radius.xl, opacity: 0.9 }} // <-- Increased opacity for more visible image
+                imageStyle={{ borderRadius: SIZES.radius.xl, opacity: 0.9 }}
                 resizeMode="cover"
               >
                 <LinearGradient
                   colors={[
-                    COLORS.primary.main + '99', // <-- More transparent overlay
+                    COLORS.primary.main + '99',
                     COLORS.primary.light + '11',
                   ]}
                   start={{ x: 0, y: 0.7 }}
@@ -431,7 +420,6 @@ const HomeScreen = ({ navigation }) => {
     container: {
       flex: 1,
       backgroundColor: COLORS.background.default,
-      //paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     },
     header: {
       flexDirection: 'row',
@@ -443,7 +431,7 @@ const HomeScreen = ({ navigation }) => {
     },
     headerTitle: {
       fontFamily: FONTS.bold,
-      fontSize: FONTS.sizes.xxl,
+      fontSize: width < 400 ? FONTS.sizes.lg : width < 700 ? FONTS.sizes.xl : FONTS.sizes.xxl,
       color: COLORS.primary.main,
     },
     headerActions: {
@@ -457,7 +445,7 @@ const HomeScreen = ({ navigation }) => {
     },
     sectionTitle: {
       fontFamily: FONTS.semiBold,
-      fontSize: FONTS.sizes.lg,
+      fontSize: width < 400 ? FONTS.sizes.md : FONTS.sizes.lg,
       color: COLORS.text.primary,
       padding: SIZES.padding.md,
       paddingBottom: 0,
@@ -466,22 +454,26 @@ const HomeScreen = ({ navigation }) => {
       padding: SIZES.padding.sm,
     },
     productCard: {
-      // width is now set dynamically in renderProduct
       backgroundColor: COLORS.background.paper,
       borderRadius: SIZES.radius.md,
       ...SHADOWS.light,
-      margin: SIZES.padding.sm,
+      margin: cardSpacing / 2,
       overflow: 'hidden',
+      alignItems: 'center',
+      flex: 1,
+      minWidth: 140,
+      maxWidth: 350,
     },
     productImage: {
       width: '100%',
-      height: width < 400 ? 100 : 160, // responsive image height
+      height: width < 400 ? 100 : width < 700 ? 140 : 180,
       borderTopLeftRadius: SIZES.radius.md,
       borderTopRightRadius: SIZES.radius.md,
       backgroundColor: COLORS.background.dark,
     },
     productInfo: {
       padding: SIZES.padding.md,
+      width: '100%',
     },
     productCategory: {
       fontFamily: FONTS.medium,
@@ -492,7 +484,7 @@ const HomeScreen = ({ navigation }) => {
     },
     productTitle: {
       fontFamily: FONTS.semiBold,
-      fontSize: FONTS.sizes.md,
+      fontSize: width < 400 ? FONTS.sizes.sm : FONTS.sizes.md,
       color: COLORS.text.primary,
       marginBottom: SIZES.padding.xs,
     },
@@ -506,27 +498,8 @@ const HomeScreen = ({ navigation }) => {
       padding: SIZES.padding.md,
       borderTopWidth: 1,
       borderTopColor: COLORS.border,
-    },
-    quantityContainer: {
-      flexDirection: 'row',
+      width: '100%',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      backgroundColor: COLORS.background.dark,
-      borderRadius: SIZES.radius.round,
-      padding: SIZES.padding.xs,
-    },
-    quantityButton: {
-      backgroundColor: COLORS.primary.main,
-      borderRadius: SIZES.radius.round,
-      width: 30,
-      height: 30,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    quantityText: {
-      fontFamily: FONTS.semiBold,
-      fontSize: FONTS.sizes.md,
-      color: COLORS.text.primary,
     },
     addToCartButton: {
       backgroundColor: COLORS.primary.main,
@@ -537,6 +510,9 @@ const HomeScreen = ({ navigation }) => {
       borderRadius: SIZES.radius.round,
       marginTop: SIZES.padding.sm,
       gap: SIZES.padding.sm,
+      minWidth: 120,
+      maxWidth: 220,
+      alignSelf: 'center',
     },
     buttonText: {
       fontFamily: FONTS.semiBold,
@@ -556,31 +532,6 @@ const HomeScreen = ({ navigation }) => {
     categoryContainer: {
       marginVertical: SIZES.padding.sm,
     },
-    categoryList: {
-      paddingHorizontal: SIZES.padding.md,
-    },
-    categoryItem: {
-      paddingHorizontal: SIZES.padding.md,
-      paddingVertical: SIZES.padding.sm,
-      borderRadius: SIZES.radius.round,
-      backgroundColor: COLORS.background.paper,
-      borderWidth: 1,
-      borderColor: COLORS.border,
-      marginRight: SIZES.padding.sm,
-      ...SHADOWS.light,
-    },
-    categoryItemActive: {
-      backgroundColor: COLORS.primary.main,
-      borderColor: COLORS.primary.main,
-    },
-    categoryText: {
-      fontFamily: FONTS.medium,
-      fontSize: FONTS.sizes.sm,
-      color: COLORS.text.secondary,
-    },
-    categoryTextActive: {
-      color: COLORS.primary.contrast,
-    },
     recommendationsContainer: {
       marginBottom: SIZES.padding.md,
     },
@@ -588,25 +539,28 @@ const HomeScreen = ({ navigation }) => {
       paddingHorizontal: SIZES.padding.md,
     },
     recommendationCard: {
-      width: width < 400 ? 110 : 160,
       backgroundColor: COLORS.background.paper,
       borderRadius: SIZES.radius.md,
       marginRight: SIZES.padding.sm,
       ...SHADOWS.light,
+      alignItems: 'center',
+      minWidth: 120,
+      maxWidth: 220,
     },
     recommendationImage: {
       width: '100%',
-      height: width < 400 ? 80 : 160,
+      height: width < 400 ? 80 : width < 700 ? 120 : 160,
       backgroundColor: COLORS.background.dark,
       borderTopLeftRadius: SIZES.radius.md,
       borderTopRightRadius: SIZES.radius.md,
     },
     recommendationInfo: {
       padding: SIZES.padding.md,
+      width: '100%',
     },
     recommendationTitle: {
       fontFamily: FONTS.medium,
-      fontSize: FONTS.sizes.sm,
+      fontSize: width < 400 ? FONTS.sizes.xs : FONTS.sizes.sm,
       color: COLORS.text.primary,
       marginBottom: SIZES.padding.xs,
     },
@@ -615,16 +569,6 @@ const HomeScreen = ({ navigation }) => {
       fontSize: FONTS.sizes.md,
       color: COLORS.primary.main,
       marginBottom: SIZES.padding.xs,
-    },
-    ratingContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    ratingText: {
-      marginLeft: SIZES.padding.xs,
-      fontFamily: FONTS.medium,
-      fontSize: FONTS.sizes.xs,
-      color: COLORS.text.secondary,
     },
     searchContainer: {
       flexDirection: 'row',
@@ -697,8 +641,6 @@ const HomeScreen = ({ navigation }) => {
       backgroundColor: COLORS.background.paper,
       justifyContent: 'center',
       alignItems: 'center',
-      // Optionally, you can add minHeight here for extra effect:
-      // minHeight: 180,
     },
     bannerBgImage: {
       width: '100%',
@@ -713,24 +655,22 @@ const HomeScreen = ({ navigation }) => {
       paddingBottom: SIZES.padding.xs,
     },
     bannerContent: {
-      //backgroundColor: 'rgba(0,0,0,0.18)',
       borderRadius: SIZES.radius.md,
       padding: SIZES.padding.lg,
       marginBottom: SIZES.padding.lg,
     },
     bannerTitle: {
       fontFamily: FONTS.bold,
-      fontSize: FONTS.sizes.sm,
+      fontSize: width < 400 ? FONTS.sizes.sm : FONTS.sizes.md,
       color: '#fff',
       marginBottom: 4,
-      //letterSpacing: 0.5,
       textShadowColor: 'rgba(0,0,0,0.25)',
       textShadowOffset: { width: 1, height: 2 },
       textShadowRadius: 6,
     },
     bannerSubtitle: {
       fontFamily: FONTS.medium,
-      fontSize: FONTS.sizes.xs,
+      fontSize: width < 400 ? FONTS.sizes.xs : FONTS.sizes.sm,
       color: '#f0f6fa',
       opacity: 0.97,
       marginTop: 2,
@@ -759,7 +699,7 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Decorative SVG background with more color and design */}
+      {/* Decorative SVG background */}
       <View style={StyleSheet.absoluteFill}>
         <Svg height="100%" width="100%" style={{ position: 'absolute' }}>
           {/* Top left ellipse with gradient */}
@@ -839,28 +779,14 @@ const HomeScreen = ({ navigation }) => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>TradeMate</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity 
-            style={styles.iconButton}
-            onPress={() => setIsSearchVisible(!isSearchVisible)}
-          >
-            <MaterialIcons 
-              name={isSearchVisible ? "close" : "search"} 
-              size={24} 
-              color={COLORS.text.primary} 
-            />
-          </TouchableOpacity>
-        </View>
       </View>
-
-      {isSearchVisible && <SearchBar />}
 
       <FlatList
         data={getFilteredProducts()}
         renderItem={renderProduct}
         keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.productList}
-        numColumns={2}
+        numColumns={getNumColumns()}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={() => (
           <>
@@ -880,6 +806,8 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.emptyText}>No products found</Text>
           </View>
         )}
+        refreshing={refreshing}
+        onRefresh={loadProducts}
       />
     </SafeAreaView>
   );
