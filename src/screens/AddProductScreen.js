@@ -68,11 +68,11 @@ const AddProductScreen = ({ navigation }) => {
       // Prepare data for Cloudinary
       const data = {
         file: `data:image/jpeg;base64,${base64}`,
-        upload_preset: 'unsigned_preset', // <-- Replace with your unsigned upload preset
+        upload_preset: 'unsigned_preset',
       };
 
       // Upload to Cloudinary
-      const response = await fetch('https://api.cloudinary.com/v1_1/djvaxbxgu/image/upload', { // <-- Replace with your cloud name
+      const response = await fetch('https://api.cloudinary.com/v1_1/djvaxbxgu/image/upload', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
